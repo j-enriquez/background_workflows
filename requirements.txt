@@ -1,0 +1,8 @@
+azure-core==1.32.0
+azure-data-tables==12.6.0
+azure-storage-blob==12.24.1
+azure-storage-queue==12.12.0
+psutil==5.9.4
+python-dotenv==1.0.1
+celery[redis]==5.2.7
+celery[test]
