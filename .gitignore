@@ -1,0 +1,9 @@
+# Ignore environment file
+.env
+
+# Ignore all files ending in .db
+*.db
+
+.idea/*
+
+*__pycache__*

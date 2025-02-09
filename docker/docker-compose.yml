@@ -1,0 +1,66 @@
+# docker/docker-compose.yml
+
+version: "3.9"
+
+services:
+  # 1) Azurite for local Azure Storage
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: my_azurite
+    command: >
+      azurite 
+        -l /data 
+        --silent
+        --blobHost 0.0.0.0 --blobPort 10000
+        --queueHost 0.0.0.0 --queuePort 10001
+        --tableHost 0.0.0.0 --tablePort 10002
+    ports:
+      - "10000:10000" # Blob
+      - "10001:10001" # Queue
+      - "10002:10002" # Table
+    volumes:
+      - azurite_data:/data
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:10000/devstoreaccount1 || exit 1" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 2) Redis for Celery
+  redis:
+    image: "redis:latest"
+    container_name: "my_redis"
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+
+  # 3) Our test-runner container
+  test-runner:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: "my_test_runner"
+    depends_on:
+      - azurite
+      - redis
+    environment:
+      - PYTHONUNBUFFERED=1
+      - STORE_MODE=azure
+
+      # Azurite connection string
+      - AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
+
+      # For Celery
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_BACKEND_URL=redis://redis:6379/1
+
+    # Tests
+    command: >
+      bash -c "python -m unittest discover Tests -v"
+
+volumes:
+  azurite_data:
