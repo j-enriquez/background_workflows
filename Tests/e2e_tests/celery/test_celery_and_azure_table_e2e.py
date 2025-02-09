@@ -1,4 +1,5 @@
 import os
+import shutil
 import time
 import unittest
 from typing import Any, Optional
@@ -15,17 +16,14 @@ from Tests.sample_tasks.sample_task import SampleTask
 from Tests.tests_suites_helpers.test_helper import TestHelper
 from background_workflows.constants.app_constants import AppConstants
 from background_workflows.storage.queue.celery_queue_backend import CeleryQueueBackend
-from background_workflows.storage.tables.azure_task_store import AzureTaskStore
 from background_workflows.storage.tables.sqlite_task_store import SqliteTaskStore
+from background_workflows.storage.tables.task_store_factory import TaskStoreFactory
 from background_workflows.utils.workflow_client import WorkflowClient
+from background_workflows.storage.blobs.local_blob_store import LocalBlobStore
 
 # Ensure that the SampleTask and ping class is registered (side-effect of import)
 SampleTask
 ping
-
-# Generate a unique SQLite database path for testing.
-db_path: str = f"TestCeleryE2E_{TestHelper.generate_guid_for_local_db()}.db"
-
 
 class TestCeleryWithSqliteE2E(unittest.TestCase):
     @classmethod
@@ -62,24 +60,34 @@ class TestCeleryWithSqliteE2E(unittest.TestCase):
           - Initialize the Celery queue backend and local SQLite task store.
           - Create a WorkflowClient for starting and querying tasks.
         """
-        if os.path.exists(db_path):
-            os.remove(db_path)
 
         self.queue_backend: CeleryQueueBackend = CeleryQueueBackend(
             celery_app=self.celery_app,
             task_name=AppConstants.Celery.TASK_NAME_BACKGROUND,
         )
-        self.task_store: SqliteTaskStore = SqliteTaskStore(db_path=db_path)
-        self.task_store.create_if_not_exists()
-        self.client: WorkflowClient = WorkflowClient(self.task_store, self.queue_backend)
+
+        factory = TaskStoreFactory( store_mode = AppConstants.TaskStoreFactory.StoreModes.AZURE, azure_connection_string = AppConstants.TaskStoreFactory.get_azure_storage_connection_string() )
+        self.task_store = factory.get_task_store()
+
+        # Initialize a local Blob Store (could be AzureBlobStore in production)
+        self.unique_root = f"test_blobs_celery_azure_{TestHelper.generate_guid_for_blob()}"
+        self.blob_store = LocalBlobStore(root_dir=self.unique_root)  # Using local blob store for testing
+
+        # Initialize the WorkflowClient with the blob store
+        self.client: WorkflowClient = WorkflowClient(self.task_store, self.queue_backend, self.blob_store)
 
     def tearDown(self) -> None:
         """
         Tear down the test environment by closing the task store and removing the test database file.
         """
-        self.task_store.close()
-        if os.path.exists(db_path):
-            os.remove(db_path)
+
+        if os.path.exists( self.unique_root ):
+            try:
+                # Remove directory and all its contents
+                shutil.rmtree( self.unique_root )
+                print( f"Successfully deleted {self.unique_root}" )
+            except Exception as e:
+                print( f"Failed to delete {self.unique_root}: {e}" )
 
     def test_sample_task_e2e(self) -> None:
         """
@@ -92,19 +100,24 @@ class TestCeleryWithSqliteE2E(unittest.TestCase):
           4. Retrieve and validate the task result.
         """
         with start_worker(self.celery_app, pool="solo") as worker:
-            # 1) Start an activity by enqueuing a task.
-            print(AppConstants.TaskStoreFactory.get_active_store_mode())
+            # 1) Prepare the blob content to pass
+            blob_content = "This is some blob content"
+
+            # 2) Start an activity by enqueuing a task.
             row_key: str = self.client.start_activity(
                 activity_type="SAMPLE_TASK",
                 resource_id="TestRes",
-                store_mode=AppConstants.TaskStoreFactory.StoreModes.SQLITE,
-                database_name=db_path,
+                store_mode=AppConstants.TaskStoreFactory.StoreModes.AZURE,
+                database_name="",
+                container_name="test_container",  # Add blob container
+                blob_name="test_blob",  # Add blob name
+                blob_content=blob_content,  # Pass the blob content here
                 x=21,
                 y="HelloE2E",
             )
             print("Enqueued Celery-based task with row_key =", row_key)
 
-            # 2) Wait (poll) for the task to complete (up to 15 seconds).
+            # 3) Wait (poll) for the task to complete (up to 15 seconds).
             status: Optional[str] = None
             for _ in range(15):
                 status = self.client.get_status(row_key, "TestRes")
@@ -112,7 +125,7 @@ class TestCeleryWithSqliteE2E(unittest.TestCase):
                     break
                 time.sleep(1)
 
-            # 3) Verify the final status.
+            # 4) Verify the final status.
             final_status: Optional[str] = self.client.get_status(row_key, "TestRes")
             self.assertEqual(
                 final_status,
@@ -120,7 +133,7 @@ class TestCeleryWithSqliteE2E(unittest.TestCase):
                 f"Task should be COMPLETED, got {final_status}",
             )
 
-            # 4) Retrieve and validate the task result.
+            # 5) Retrieve and validate the task result.
             result: Optional[Any] = self.client.get_result(row_key, "TestRes")
             self.assertIsNotNone(result, "Should have a result payload after completion.")
             self.assertIn("answer", result, "Result should include 'answer'.")
@@ -128,6 +141,6 @@ class TestCeleryWithSqliteE2E(unittest.TestCase):
             self.assertEqual(result["answer"], 42, "Expected answer to be 42 (21 * 2).")
             self.assertEqual(result["echo"], "HelloE2E", "Expected echo to be 'HelloE2E'.")
 
-
-if __name__ == "__main__":
-    unittest.main()
+            # Validate that container_name and blob_name are part of the result
+            self.assertEqual(result["ContainerName"], "test_container", "Expected 'ContainerName' to be 'test_container'.")
+            self.assertEqual(result["BlobName"], "test_blob", "Expected 'BlobName' to be 'test_blob'.")

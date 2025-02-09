@@ -1,5 +1,5 @@
 # background_workflows/storage/queue/azure_queue_backend.py
-
+from azure.core.exceptions import ResourceExistsError
 from azure.storage.queue import QueueClient, QueueMessage
 from typing import Any, Iterable
 from .i_queue_backend import IQueueBackend
@@ -30,10 +30,14 @@ class AzureQueueBackend( IQueueBackend ):
 
         Initializes the queue client using the provided connection string and queue name.
         """
-        self.queue_client = QueueClient.from_connection_string(
-            conn_str = self.connection_string, queue_name = self.queue_name
-        )
-        self.queue_client.create_queue()
+        try:
+            self.queue_client = QueueClient.from_connection_string(
+                conn_str = self.connection_string, queue_name = self.queue_name
+            )
+            self.queue_client.create_queue()
+        except ResourceExistsError:
+            # The container already exists, so no further action is needed.
+            pass
 
     def send_message(self, msg_str: str) -> None:
         """

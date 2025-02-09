@@ -1,15 +1,15 @@
-# background_workflows/saga/task_creation_saga.py
-
 import json
 import uuid
-from typing import Any, Dict, Optional
+from typing import Optional, Any, Dict
 
 from background_workflows.constants.app_constants import AppConstants
+from background_workflows.storage.blobs.i_blob_store import IBlobStore
 from background_workflows.storage.queue.i_queue_backend import IQueueBackend
 from background_workflows.storage.tables.i_task_storage import ITaskStore
 from background_workflows.storage.schemas.task_entity import TaskEntity
 from background_workflows.storage.schemas.task_message import TaskMessage
 from background_workflows.utils.task_logger import logger
+
 
 class SagaFailure(Exception):
     """
@@ -23,10 +23,12 @@ class TaskCreationSaga:
     SAGA for creating a new task entity and sending it to the queue.
 
     Steps:
-      1) Prepare a new TaskEntity (CREATED).
-      2) Insert/Upsert it in the DB (active store).
-      3) Enqueue the message in the queue backend.
-      4) If any step fails, revert or mark the DB record so we don't have 'orphan' tasks.
+      1) Upload a blob to Azure Blob Storage.
+      2) Prepare a new TaskEntity (CREATED).
+      3) Insert/Upsert it in the DB (active store).
+      4) Enqueue the message in the queue backend.
+      5) If any step fails, revert or mark the DB record so we don't have 'orphan' tasks.
+      6) If the blob was created, delete it in case of failure.
     """
 
     def __init__(
@@ -34,21 +36,29 @@ class TaskCreationSaga:
         activity_type: str,
         task_store: ITaskStore,
         queue_backend: IQueueBackend,
+        blob_store: IBlobStore,
         resource_id: Optional[str],
         store_mode: Optional[str],
         active_table_name: Optional[str],
         finished_table_name: Optional[str],
         database_name: Optional[str],
+        container_name: Optional[str] = None,
+        blob_name: Optional[str] = None,
+        blob_content: Optional[str] = None,
         **kwargs: Any,
     ):
         self.activity_type = activity_type
         self.task_store = task_store
         self.queue_backend = queue_backend
+        self.blob_store = blob_store
         self.resource_id = resource_id
         self.store_mode = store_mode
         self.active_table_name = active_table_name
         self.finished_table_name = finished_table_name
         self.database_name = database_name
+        self.container_name = container_name
+        self.blob_name = blob_name
+        self.blob_content = blob_content
         self.kwargs = kwargs
 
         # Generate a unique RowKey for the new task
@@ -62,6 +72,8 @@ class TaskCreationSaga:
             InputPayload=json.dumps(kwargs),
             OutputPayload="",
             Status=AppConstants.TaskStatus.CREATED,
+            ContainerName = self.container_name,
+            BlobName = self.blob_name
         )
 
     def run_saga(self) -> str:
@@ -70,16 +82,30 @@ class TaskCreationSaga:
         Returns the row_key if successful, or raises SagaFailure on error.
         """
 
-        # Step A: Upsert entity into the store
-        self._step_upsert_task()
+        # Step 1: Upload the blob if container and blob names are provided
+        if self.container_name and self.blob_name and self.blob_content:
+            try:
+                self.blob_store.upload_blob(self.container_name, self.blob_name, self.blob_content.encode('utf-8'))
+                logger.info(f"[TaskCreationSaga] Blob {self.blob_name} uploaded to container {self.container_name}.")
+            except Exception as ex:
+                logger.error(f"[TaskCreationSaga] Failed to upload blob: {ex}")
+                raise SagaFailure(f"Failed to upload blob: {ex}")
 
-        # Step B: Enqueue the task message
+        # Step 2: Upsert the task entity into the store
+        try:
+            self._step_upsert_task()
+        except Exception as ex:
+            self._delete_blob_if_exists()
+            raise SagaFailure( f"Failed to upsert row: {ex}" ) from ex
+
+        # Step 3: Enqueue the task message
         try:
             self._step_enqueue_message()
         except Exception as ex:
-            logger.error(f"[TaskCreationSaga] Step B failed => {ex}")
-            # Step B Failure: do compensation
+            logger.error(f"[TaskCreationSaga] Step 3 failed => {ex}")
+            # Step 3 Failure: Compensation
             self._compensate_upsert_task_failure()
+            self._delete_blob_if_exists()
             raise SagaFailure(f"Failed to enqueue task message: {ex}") from ex
 
         logger.info(f"[TaskCreationSaga] Completed successfully (row_key={self.row_key}).")
@@ -94,7 +120,7 @@ class TaskCreationSaga:
 
     def _step_enqueue_message(self) -> None:
         """
-        Build the task message and send to the queue.
+        Build the task message and send it to the queue.
         If this fails, we do a compensation in _compensate_upsert_task_failure.
         """
         message_data = {
@@ -128,3 +154,14 @@ class TaskCreationSaga:
         except Exception as ex:
             logger.error(f"[TaskCreationSaga] Compensation failed => {ex}")
             # For a real system, you might log/alert if compensation also fails.
+
+    def _delete_blob_if_exists(self) -> None:
+        """
+        Deletes the blob from the Azure Blob Storage if it was created.
+        """
+        if self.container_name and self.blob_name:
+            try:
+                logger.info(f"[TaskCreationSaga] Deleting blob {self.blob_name} in container {self.container_name}.")
+                self.blob_store.delete_blob(self.container_name, self.blob_name)
+            except Exception as ex:
+                logger.error(f"[TaskCreationSaga] Failed to delete blob {self.blob_name}: {ex}")

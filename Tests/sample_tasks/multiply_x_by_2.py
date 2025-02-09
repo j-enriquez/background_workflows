@@ -27,10 +27,12 @@ class MultiplyXBy2( ProcessSingleQueue ):
         # Extract values with defaults.
         x: Any = input_data.get( "x", 0 )
         y: Any = input_data.get( "y", "no message" )
+        container_name: Any = payload.get( "container_name", "" )
+        blob_name: Any = payload.get( "blob_name", "" )
 
         # Perform computation: multiply x by 2.
         answer: Any = x * 2
         details: str = f"Hello: {y}"
 
-        result_data: Dict[ str, Any ] = {"answer": answer, "details": details}
+        result_data: Dict[ str, Any ] = {"answer": answer, "details": details, "ContainerName": container_name, "BlobName": blob_name}
         return json.dumps( result_data )
