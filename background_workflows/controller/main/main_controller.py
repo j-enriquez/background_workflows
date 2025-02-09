@@ -98,7 +98,6 @@ class MainController(BaseController):
             max_messages=max_messages,
             visibility_timeout=AppConstants.MainController.DEFAULT_VISIBILITY_TIMEOUT,
         )
-        logger.info(f"Polled {len(msgs)} messages from the queue.")
         if not msgs:
             return
 
