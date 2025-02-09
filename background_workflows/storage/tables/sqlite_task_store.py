@@ -1,5 +1,3 @@
-# background_workflows/storage/tables/sqlite_task_store.py
-
 import sqlite3
 import os
 from datetime import datetime
@@ -60,6 +58,8 @@ class SqliteTaskStore(ITaskStore):
                         end_time TEXT,
                         batch_id TEXT,
                         error_message TEXT,
+                        container_name TEXT,
+                        blob_name TEXT,
                         PRIMARY KEY(resource_id, row_key)
                     );
                     """
@@ -78,6 +78,8 @@ class SqliteTaskStore(ITaskStore):
                         end_time TEXT,
                         batch_id TEXT,
                         error_message TEXT,
+                        container_name TEXT,
+                        blob_name TEXT,
                         PRIMARY KEY(resource_id, row_key)
                     );
                     """
@@ -102,6 +104,8 @@ class SqliteTaskStore(ITaskStore):
             EndTime=row[7],
             BatchID=row[8],
             ErrorMessage=row[9],
+            ContainerName=row[10],
+            BlobName=row[11]
         )
 
     def get_task(self, resource_id: str, row_key: str) -> Optional[TaskEntity]:
@@ -161,7 +165,9 @@ class SqliteTaskStore(ITaskStore):
                         start_time,
                         end_time,
                         batch_id,
-                        error_message
+                        error_message,
+                        container_name,
+                        blob_name
                     )
                     VALUES (
                         :PartitionKey,
@@ -173,7 +179,9 @@ class SqliteTaskStore(ITaskStore):
                         :StartTime,
                         :EndTime,
                         :BatchID,
-                        :ErrorMessage
+                        :ErrorMessage,
+                        :ContainerName,
+                        :BlobName
                     )
                     ON CONFLICT(resource_id, row_key) DO UPDATE SET
                         task_type = COALESCE(excluded.task_type, {self.active_table_name}.task_type),
@@ -183,7 +191,9 @@ class SqliteTaskStore(ITaskStore):
                         start_time = COALESCE(excluded.start_time, {self.active_table_name}.start_time),
                         end_time = COALESCE(excluded.end_time, {self.active_table_name}.end_time),
                         batch_id = COALESCE(excluded.batch_id, {self.active_table_name}.batch_id),
-                        error_message = COALESCE(excluded.error_message, {self.active_table_name}.error_message)
+                        error_message = COALESCE(excluded.error_message, {self.active_table_name}.error_message),
+                        container_name = COALESCE(excluded.container_name, {self.active_table_name}.container_name),
+                        blob_name = COALESCE(excluded.blob_name, {self.active_table_name}.blob_name)
                     """,
                     data,
                 )
@@ -228,7 +238,9 @@ class SqliteTaskStore(ITaskStore):
                     start_time,
                     end_time,
                     batch_id,
-                    error_message
+                    error_message,
+                    container_name,
+                    blob_name
                 )
                 VALUES (
                     :PartitionKey,
@@ -240,7 +252,9 @@ class SqliteTaskStore(ITaskStore):
                     :StartTime,
                     :EndTime,
                     :BatchID,
-                    :ErrorMessage
+                    :ErrorMessage,
+                    :ContainerName,
+                    :BlobName
                 )
                 """,
                 data,
@@ -266,7 +280,9 @@ class SqliteTaskStore(ITaskStore):
                        start_time,
                        end_time,
                        batch_id,
-                       error_message
+                       error_message,
+                       container_name,
+                       blob_name
                 FROM {self.active_table_name}
                 WHERE resource_id=?
                 """,

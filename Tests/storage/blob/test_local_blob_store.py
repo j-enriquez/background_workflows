@@ -12,7 +12,7 @@ class TestLocalBlobStore( unittest.TestCase ):
         """
         Set up a unique root directory for blob storage tests and initialize a LocalBlobStore.
         """
-        self.unique_root: str = f"test_blobs_{uuid.uuid4().hex[ :6 ]}"
+        self.unique_root: str = f"test_blobs_TestLocalBlobStore_{uuid.uuid4().hex[ :6 ]}"
         self.store: LocalBlobStore = LocalBlobStore( root_dir = self.unique_root )
 
     def tearDown(self) -> None:
@@ -20,7 +20,12 @@ class TestLocalBlobStore( unittest.TestCase ):
         Clean up the unique root directory after each test.
         """
         if os.path.exists( self.unique_root ):
-            shutil.rmtree( self.unique_root )
+            try:
+                # Remove directory and all its contents
+                shutil.rmtree( self.unique_root )
+                print( f"Successfully deleted {self.unique_root}" )
+            except Exception as e:
+                print( f"Failed to delete {self.unique_root}: {e}" )
 
     def test_create_container(self) -> None:
         """
