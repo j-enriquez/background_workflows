@@ -17,5 +17,8 @@ class SampleTask(ProcessSingleQueue):
         y: Any = payload.get("y", "")
         logger.info(f"[SampleTask] Received x={x}, y={y}")
 
-        result_data: Dict[str, Any] = {"answer": x * 2, "echo": y}
+        container_name: Any = payload.get( "container_name", "" )
+        blob_name: Any = payload.get( "blob_name", "" )
+
+        result_data: Dict[str, Any] = {"answer": x * 2, "echo": y, "ContainerName": container_name, "BlobName": blob_name }
         return json.dumps(result_data)

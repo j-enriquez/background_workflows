@@ -26,14 +26,8 @@ class AppConstants:
 
         AZURE_STORAGE_CONNECTION_STRING_ENV_KEY: Final[str] = "AZURE_STORAGE_CONNECTION_STRING"
         # Default connection string intended for local Azurite usage.
-        AZURE_STORAGE_CONNECTION_STRING_DEFAULT: Final[str] = (
-            "DefaultEndpointsProtocol=http;"
-            "AccountName=devstoreaccount1;"
-            "AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;"
-            "BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
-            "QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;"
-            "TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-        )
+        AZURE_STORAGE_CONNECTION_STRING_DEFAULT: Final[str] = "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+
 
         SQLITE_DB_PATH_ENV_KEY: Final[str] = "SQLITE_DB_PATH"
         SQLITE_DB_PATH_DEFAULT: Final[str] = "local_tasks.db"
@@ -159,6 +153,8 @@ class AppConstants:
         END_TIME: Final[str] = "EndTime"
         BATCH_ID: Final[str] = "BatchID"
         ERROR_MESSAGE: Final[str] = "ErrorMessage"
+        CONTAINER_NAME: Final[str] = "ContainerName"
+        BLOB_NAME: Final[str] = "BlobName"
 
     class MessageKeys:
         CONTENT: Final[str] = "content"

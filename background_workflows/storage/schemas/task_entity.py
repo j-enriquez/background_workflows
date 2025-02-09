@@ -1,9 +1,6 @@
-# background_workflows/storage/schemas/task_schemas.py
-
 from datetime import datetime
 from typing import Any, Dict, Optional
 from background_workflows.constants.app_constants import AppConstants
-
 
 class TaskEntity:
     """
@@ -22,24 +19,28 @@ class TaskEntity:
 
         :param kwargs: Dictionary containing task fields.
         """
-        self.PartitionKey: Optional[ str ] = kwargs.get( AppConstants.TaskTableFields.PARTITION_KEY )
-        self.RowKey: Optional[ str ] = kwargs.get( AppConstants.TaskTableFields.ROW_KEY )
+        self.PartitionKey: Optional[str] = kwargs.get(AppConstants.TaskTableFields.PARTITION_KEY)
+        self.RowKey: Optional[str] = kwargs.get(AppConstants.TaskTableFields.ROW_KEY)
         # ResourceId is derived from PartitionKey.
-        self.ResourceId: Optional[ str ] = self.PartitionKey
+        self.ResourceId: Optional[str] = self.PartitionKey
 
-        self.TaskType: str = kwargs.get( AppConstants.TaskTableFields.TASK_TYPE, "" )
-        self.Status: str = kwargs.get( AppConstants.TaskTableFields.STATUS, AppConstants.TaskStatus.CREATED )
-        self.InputPayload: str = kwargs.get( AppConstants.TaskTableFields.INPUT_PAYLOAD, "" )
-        self.OutputPayload: str = kwargs.get( AppConstants.TaskTableFields.OUTPUT_PAYLOAD, "" )
+        self.TaskType: str = kwargs.get(AppConstants.TaskTableFields.TASK_TYPE, "")
+        self.Status: str = kwargs.get(AppConstants.TaskTableFields.STATUS, AppConstants.TaskStatus.CREATED)
+        self.InputPayload: str = kwargs.get(AppConstants.TaskTableFields.INPUT_PAYLOAD, "")
+        self.OutputPayload: str = kwargs.get(AppConstants.TaskTableFields.OUTPUT_PAYLOAD, "")
 
         # StartTime and EndTime can be datetime objects or None.
-        self.StartTime: Optional[ Any ] = kwargs.get( AppConstants.TaskTableFields.START_TIME, None )
-        self.EndTime: Optional[ Any ] = kwargs.get( AppConstants.TaskTableFields.END_TIME, None )
+        self.StartTime: Optional[Any] = kwargs.get(AppConstants.TaskTableFields.START_TIME, None)
+        self.EndTime: Optional[Any] = kwargs.get(AppConstants.TaskTableFields.END_TIME, None)
 
-        self.BatchID: str = kwargs.get( AppConstants.TaskTableFields.BATCH_ID, "" )
-        self.ErrorMessage: Optional[ str ] = kwargs.get( AppConstants.TaskTableFields.ERROR_MESSAGE, None )
+        self.BatchID: str = kwargs.get(AppConstants.TaskTableFields.BATCH_ID, "")
+        self.ErrorMessage: Optional[str] = kwargs.get(AppConstants.TaskTableFields.ERROR_MESSAGE, None)
 
-    def to_dict(self) -> Dict[ str, Any ]:
+        self.ContainerName: Optional[str] = kwargs.get(AppConstants.TaskTableFields.CONTAINER_NAME, None)
+        self.BlobName: Optional[str] = kwargs.get(AppConstants.TaskTableFields.BLOB_NAME, None)
+
+
+    def to_dict(self) -> Dict[str, Any]:
         """
         Convert this TaskEntity to a dictionary suitable for storage upsert operations.
 
@@ -47,7 +48,7 @@ class TaskEntity:
 
         :return: A dictionary representation of the task entity.
         """
-        return {
+        task_dict = {
             AppConstants.TaskTableFields.PARTITION_KEY: self.ResourceId,
             AppConstants.TaskTableFields.ROW_KEY: self.RowKey,
             AppConstants.TaskTableFields.TASK_TYPE: self.TaskType,
@@ -58,7 +59,11 @@ class TaskEntity:
             AppConstants.TaskTableFields.END_TIME: self.EndTime,
             AppConstants.TaskTableFields.BATCH_ID: self.BatchID,
             AppConstants.TaskTableFields.ERROR_MESSAGE: self.ErrorMessage,
+            AppConstants.TaskTableFields.CONTAINER_NAME: self.ContainerName,
+            AppConstants.TaskTableFields.BLOB_NAME: self.BlobName,
         }
+
+        return task_dict
 
     def mark_running(self) -> None:
         """

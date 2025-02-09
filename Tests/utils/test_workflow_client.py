@@ -1,4 +1,10 @@
+import os
+import shutil
 import unittest
+import uuid
+
+from Tests.tests_suites_helpers.test_helper import TestHelper
+from background_workflows.storage.blobs.local_blob_store import LocalBlobStore
 from background_workflows.utils.workflow_client import WorkflowClient
 from background_workflows.storage.tables.sqlite_task_store import SqliteTaskStore
 from background_workflows.storage.queue.local_queue_backend import LocalQueueBackend
@@ -12,7 +18,22 @@ class TestWorkflowClient(unittest.TestCase):
         self.store = SqliteTaskStore(":memory:")
         self.store.create_if_not_exists()
         self.queue = LocalQueueBackend()
-        self.client = WorkflowClient(self.store, self.queue)
+        self.unique_root = f"test_blobs_TestWorkflowClient_{TestHelper.generate_guid_for_blob()}"
+        self.blob: LocalBlobStore = LocalBlobStore( root_dir = self.unique_root  )
+        self.client = WorkflowClient(self.store, self.queue, self.blob)
+
+    def tearDown(self) -> None:
+        """
+        Tear down the test environment by closing the task store and removing the test database file.
+        """
+
+        if os.path.exists( self.unique_root ):
+            try:
+                # Remove directory and all its contents
+                shutil.rmtree( self.unique_root )
+                print( f"Successfully deleted {self.unique_root}" )
+            except Exception as e:
+                print( f"Failed to delete {self.unique_root}: {e}" )
 
     def test_start_activity(self) -> None:
         """

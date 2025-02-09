@@ -59,6 +59,15 @@ class ProcessSingleQueue(BaseTask):
         try:
             # Parse the input payload (assumed to be a JSON string) into a dictionary.
             input_payload: Dict[str, Any] = json.loads(entity.InputPayload)
+
+            # Retrieve container_name and blob_name from the task entity.
+            container_name: Optional[ str ] = entity.ContainerName
+            blob_name: Optional[ str ] = entity.BlobName
+            # Add container_name and blob_name to the input_payload if they exist.
+            if container_name and blob_name:
+                input_payload[ 'container_name' ] = container_name
+                input_payload[ 'blob_name' ] = blob_name
+
             # Execute the task-specific logic.
             output_payload: str = self.do_work_on_single(input_payload)
             # Save the output payload to the entity.
