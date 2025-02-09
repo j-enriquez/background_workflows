@@ -1,9 +1,13 @@
 # Ignore environment file
 .env
 
+# Ignore pypi
+.pypirc
+build/*
+background_workflows.egg-info/*
+dist/*
+
 # Ignore all files ending in .db
 *.db
-
 .idea/*
-
 *__pycache__*

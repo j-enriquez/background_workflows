@@ -44,7 +44,7 @@ The diagram below illustrates the relationships between the different controller
 ```mermaid
 flowchart TB
     subgraph Controller
-      A[BaseController<br>(abstract)]
+      A[BaseController<br> abstract]
       B[MainController]
       C[CeleryController]
     end
