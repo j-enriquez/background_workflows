@@ -11,7 +11,7 @@ with open('requirements.txt', encoding='utf-8') as f:
 # Setup configuration
 setuptools.setup(
     name="background_workflows",
-    version="0.1.0",
+    version="0.3.0",
     author="Jose Enriquez",
     author_email="joseaenriqueza@hotmail.com",
     description="Background Workflows for task processing",
